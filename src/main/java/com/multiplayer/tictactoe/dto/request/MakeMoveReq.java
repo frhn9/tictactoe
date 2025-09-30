@@ -7,16 +7,10 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateOrJoinGameReq {
-
+public class MakeMoveReq {
     private String gameId;
-
-    private int boardVerticalSize;
-
-    private int boardHorizontalSize;
-
     private String sessionId;
-
     private String deviceId;
-
+    private int row;
+    private int col;
 }
