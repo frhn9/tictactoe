@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.multiplayer.tictactoe.enums.GameStatus;
 import jakarta.persistence.Id;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.data.redis.core.RedisHash;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -41,6 +44,12 @@ public class ActiveGame implements Serializable {
     private String userIdO;
 
     private GameStatus status;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
