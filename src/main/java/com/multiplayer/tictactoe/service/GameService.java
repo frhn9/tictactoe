@@ -5,7 +5,7 @@ import com.multiplayer.tictactoe.dto.request.MakeMoveReq;
 
 public interface GameService {
 
-    void createOrJoinGame(CreateOrJoinGameReq request, String userId);
+    void createOrJoinGame(CreateOrJoinGameReq request, String sessionId);
     
     void makeMove(MakeMoveReq request);
 

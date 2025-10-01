@@ -10,9 +10,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GameStartedRes {
     private String gameId;
-    private String playerIdX;
-    private String playerIdO;
-    private String currentPlayerId;
+    private String sessionIdX;
+    private String sessionIdO;
+    private String currentTurnSessionId;
     private GameStatus status;
     private int boardVerticalSize;
     private int boardHorizontalSize;

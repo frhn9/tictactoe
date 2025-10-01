@@ -28,7 +28,6 @@ public class User implements Serializable {
     @Column(unique = true, nullable = false)
     private String sessionId;
 
-    @Column(unique = true, nullable = false)
     private String deviceId;
 
     @CreationTimestamp

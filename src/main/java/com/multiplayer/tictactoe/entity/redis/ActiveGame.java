@@ -38,11 +38,11 @@ public class ActiveGame implements Serializable {
     @Setter(AccessLevel.NONE)
     private String boardState;
 
-    private String currentTurnUserId;
+    private String currentTurnSessionId;
 
-    private String userIdX;
+    private String sessionIdX;
 
-    private String userIdO;
+    private String sessionIdO;
 
     private GameStatus status;
 

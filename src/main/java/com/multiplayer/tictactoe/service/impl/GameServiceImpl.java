@@ -31,34 +31,35 @@ public class GameServiceImpl implements GameService {
 
     public void createOrJoinGame(CreateOrJoinGameReq request, String userId) {
         if (request.getGameId() == null || request.getGameId().trim().isEmpty()) {
-            ActiveGame game = createGame(request, userId);
-
-            // Send websocket notification that game room has been created
-            GameCreatedRes gameCreatedRes = new GameCreatedRes(
+            ActiveGame game = createGame(request, request.getSessionId());
+            
+            // Send the game started message to the creator so they can see the game board
+            // even while waiting for an opponent
+            GameStartedRes gameStartedRes = new GameStartedRes(
                     game.getGameId(),
-                    userId,
-                    userId.equals(game.getUserIdX()) ? "X" : "O",
-                    game.getStatus(),
+                    game.getSessionIdX(),
+                    game.getSessionIdO(),
+                    game.getCurrentTurnSessionId(),
+                    game.getStatus(), // WAITING
                     game.getBoardVerticalSize(),
                     game.getBoardHorizontalSize()
             );
             
-            // Send to the player who created the game
             simpMessagingTemplate.convertAndSendToUser(
-                userId, 
-                "/queue/game-created", 
-                gameCreatedRes
+                request.getSessionId(), 
+                "/queue/game",
+                gameStartedRes
             );
         } else {
-            ActiveGame game = joinGame(request, userId);
+            ActiveGame game = joinGame(request, request.getSessionId());
 
             // Send websocket notification that game has started
             if (game.getStatus() == GameStatus.IN_PROGRESS) {
                 GameStartedRes gameStartedRes = new GameStartedRes(
                         game.getGameId(),
-                        game.getUserIdX(),
-                        game.getUserIdO(),
-                        game.getCurrentTurnUserId(),
+                        game.getSessionIdX(),
+                        game.getSessionIdO(),
+                        game.getCurrentTurnSessionId(),
                         game.getStatus(),
                         game.getBoardVerticalSize(),
                         game.getBoardHorizontalSize()
@@ -66,14 +67,14 @@ public class GameServiceImpl implements GameService {
                 
                 // Send to both players
                 simpMessagingTemplate.convertAndSendToUser(
-                    game.getUserIdX(), 
-                    "/queue/game-started", 
+                    game.getSessionIdX(), 
+                    "/queue/game",
                     gameStartedRes
                 );
                 
                 simpMessagingTemplate.convertAndSendToUser(
-                    game.getUserIdO(), 
-                    "/queue/game-started", 
+                    game.getSessionIdO(), 
+                    "/queue/game",
                     gameStartedRes
                 );
             }
@@ -82,7 +83,7 @@ public class GameServiceImpl implements GameService {
 
     @Override
     public void makeMove(MakeMoveReq request) {
-        // Get user based on sessionId or deviceId
+        // Get user based on sessionId or deviceId to extract the userId for logic
         User user = userService.findBySessionId(request.getSessionId());
         if (user == null) {
             user = userService.findByDeviceId(request.getDeviceId());
@@ -93,19 +94,20 @@ public class GameServiceImpl implements GameService {
         }
         
         String userId = user.getId().toString();
+        String userSessionId = request.getSessionId();
 
         // Get the game from repository
         ActiveGame game = activeGameRepository.findById(request.getGameId())
                 .orElseThrow(() -> new RuntimeException("Game not found: " + request.getGameId()));
 
         // Validate the move using GameEngine
-        if (gameEngine.isIllegalMove(game, userId, request.getRow(), request.getCol())) {
+        if (gameEngine.isIllegalMove(game, userSessionId, request.getRow(), request.getCol())) {
             // Send error response to the player
             throw new RuntimeException("Illegal move");
         }
 
         // Make the move
-        gameEngine.makeMove(game, userId, request.getRow(), request.getCol());
+        gameEngine.makeMove(game, userSessionId, request.getRow(), request.getCol());
 
         // Check win condition
         Character winner = gameEngine.checkWinCondition(game, request.getRow(), request.getCol());
@@ -121,26 +123,26 @@ public class GameServiceImpl implements GameService {
             game = activeGameRepository.save(game);
 
             // Send game over message to both players
-            String winnerId = winner == 'X' ? game.getUserIdX() : game.getUserIdO();
+            String winnerSessionId = winner == 'X' ? game.getSessionIdX() : game.getSessionIdO();
             MakeMoveRes moveRes = new MakeMoveRes(
                     game.getGameId(),
-                    userId,
+                    userSessionId,
                     request.getRow(),
                     request.getCol(),
                     game.getStatus(),
-                    winnerId,
+                    winnerSessionId,
                     null,
                     game.getBoardState()
             );
 
             simpMessagingTemplate.convertAndSendToUser(
-                    game.getUserIdX(),
+                    game.getSessionIdX(),
                     "/queue/move-made",
                     moveRes
             );
             
             simpMessagingTemplate.convertAndSendToUser(
-                    game.getUserIdO(),
+                    game.getSessionIdO(),
                     "/queue/move-made",
                     moveRes
             );
@@ -148,13 +150,13 @@ public class GameServiceImpl implements GameService {
             // Save game to history
             gameHistoryService.saveGameHistory(
                     game.getGameId(),
-                    game.getUserIdX(),
-                    game.getUserIdO(),
+                    game.getSessionIdX(),
+                    game.getSessionIdO(),
                     game.getStatus(),
                     game.getBoardVerticalSize(),
                     game.getBoardHorizontalSize(),
                     game.getBoardState() != null ? game.getBoardState().toString() : null,
-                    winnerId,
+                    winnerSessionId,
                     null // durationMs could be calculated if needed
             );
             
@@ -174,7 +176,7 @@ public class GameServiceImpl implements GameService {
             // Send game over (draw) message to both players
             MakeMoveRes moveRes = new MakeMoveRes(
                     game.getGameId(),
-                    userId,
+                    userSessionId,
                     request.getRow(),
                     request.getCol(),
                     game.getStatus(),
@@ -184,13 +186,13 @@ public class GameServiceImpl implements GameService {
             );
 
             simpMessagingTemplate.convertAndSendToUser(
-                    game.getUserIdX(),
+                    game.getSessionIdX(),
                     "/queue/move-made",
                     moveRes
             );
             
             simpMessagingTemplate.convertAndSendToUser(
-                    game.getUserIdO(),
+                    game.getSessionIdO(),
                     "/queue/move-made",
                     moveRes
             );
@@ -198,8 +200,8 @@ public class GameServiceImpl implements GameService {
             // Save game to history (draw)
             gameHistoryService.saveGameHistory(
                     game.getGameId(),
-                    game.getUserIdX(),
-                    game.getUserIdO(),
+                    game.getSessionIdX(),
+                    game.getSessionIdO(),
                     game.getStatus(),
                     game.getBoardVerticalSize(),
                     game.getBoardHorizontalSize(),
@@ -220,29 +222,29 @@ public class GameServiceImpl implements GameService {
         // Send move update to both players
         MakeMoveRes moveRes = new MakeMoveRes(
                 game.getGameId(),
-                userId,
+                userSessionId,
                 request.getRow(),
                 request.getCol(),
                 game.getStatus(),
                 null, // No winner yet
-                game.getCurrentTurnUserId(),
+                game.getCurrentTurnSessionId(),
                 game.getBoardState()
         );
 
         simpMessagingTemplate.convertAndSendToUser(
-                game.getUserIdX(),
+                game.getSessionIdX(),
                 "/queue/move-made",
                 moveRes
         );
         
         simpMessagingTemplate.convertAndSendToUser(
-                game.getUserIdO(),
+                game.getSessionIdO(),
                 "/queue/move-made",
                 moveRes
         );
     }
 
-    private ActiveGame createGame(CreateOrJoinGameReq request, String userId) {
+    private ActiveGame createGame(CreateOrJoinGameReq request, String sessionId) {
         ActiveGame game = new ActiveGame();
         game.setBoardVerticalSize(request.getBoardVerticalSize());
         game.setBoardHorizontalSize(request.getBoardHorizontalSize());
@@ -250,18 +252,18 @@ public class GameServiceImpl implements GameService {
         Random random = new Random();
         int randomNumber = random.nextInt(0, 1);
         if (randomNumber == 0) {
-            game.setUserIdX(userId);
+            game.setSessionIdX(sessionId);
         } else {
-            game.setUserIdO(userId);
+            game.setSessionIdO(sessionId);
         }
 
         game.setStatus(GameStatus.WAITING);
-        game.setCurrentTurnUserId(game.getUserIdO());
+        game.setCurrentTurnSessionId(game.getSessionIdO());
 
         return activeGameRepository.save(game);
     }
 
-    private ActiveGame joinGame(CreateOrJoinGameReq request, String userId) {
+    private ActiveGame joinGame(CreateOrJoinGameReq request, String sessionId) {
         ActiveGame game = activeGameRepository.findById(request.getGameId())
                 .orElseThrow(() -> new RuntimeException("Game not found: " + request.getGameId()));
 
@@ -271,29 +273,29 @@ public class GameServiceImpl implements GameService {
         }
 
         // Check if game is already full
-        if (game.getUserIdX() != null && game.getUserIdO() != null) {
+        if (game.getSessionIdX() != null && game.getSessionIdO() != null) {
             throw new RuntimeException("Game is already full");
         }
 
         // Check if player is already in the game
-        if (userId.equals(game.getUserIdX())) {
+        if (sessionId.equals(game.getSessionIdX())) {
             throw new RuntimeException("You are already in this game as Player X");
         }
 
-        if (userId.equals(game.getUserIdO())) {
+        if (sessionId.equals(game.getSessionIdO())) {
             throw new RuntimeException("You are already in this game as Player O");
         }
 
         Random random = new Random();
         int randomNumber = random.nextInt(0, 1);
-        if (randomNumber == 0 && game.getUserIdX() == null && game.getUserIdO() != null) {
-            game.setUserIdX(userId);
+        if (randomNumber == 0 && game.getSessionIdX() == null && game.getSessionIdO() != null) {
+            game.setSessionIdX(sessionId);
         } else {
-            game.setUserIdO(userId);
+            game.setSessionIdO(sessionId);
         }
 
         game.setStatus(GameStatus.IN_PROGRESS);
-        game.setCurrentTurnUserId(game.getUserIdX());
+        game.setCurrentTurnSessionId(game.getSessionIdX());
 
         return activeGameRepository.save(game);
     }
