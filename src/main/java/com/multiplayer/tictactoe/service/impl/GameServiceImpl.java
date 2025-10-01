@@ -45,11 +45,8 @@ public class GameServiceImpl implements GameService {
                     game.getBoardHorizontalSize()
             );
             
-            simpMessagingTemplate.convertAndSendToUser(
-                request.getSessionId(), 
-                "/queue/game",
-                gameStartedRes
-            );
+            // Use session-specific topic for reliable delivery
+            simpMessagingTemplate.convertAndSend("/topic/session/" + request.getSessionId(), gameStartedRes);
         } else {
             ActiveGame game = joinGame(request, request.getSessionId());
 
@@ -66,17 +63,9 @@ public class GameServiceImpl implements GameService {
                 );
                 
                 // Send to both players
-                simpMessagingTemplate.convertAndSendToUser(
-                    game.getSessionIdX(), 
-                    "/queue/game",
-                    gameStartedRes
-                );
-                
-                simpMessagingTemplate.convertAndSendToUser(
-                    game.getSessionIdO(), 
-                    "/queue/game",
-                    gameStartedRes
-                );
+                // Use session-specific topics for reliable delivery to both players
+                simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), gameStartedRes);
+                simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), gameStartedRes);
             }
         }
     }
@@ -135,17 +124,9 @@ public class GameServiceImpl implements GameService {
                     game.getBoardState()
             );
 
-            simpMessagingTemplate.convertAndSendToUser(
-                    game.getSessionIdX(),
-                    "/queue/move-made",
-                    moveRes
-            );
-            
-            simpMessagingTemplate.convertAndSendToUser(
-                    game.getSessionIdO(),
-                    "/queue/move-made",
-                    moveRes
-            );
+            // Use session-specific topics for reliable delivery to both players
+            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
+            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
             
             // Save game to history
             gameHistoryService.saveGameHistory(
@@ -185,17 +166,9 @@ public class GameServiceImpl implements GameService {
                     game.getBoardState()
             );
 
-            simpMessagingTemplate.convertAndSendToUser(
-                    game.getSessionIdX(),
-                    "/queue/move-made",
-                    moveRes
-            );
-            
-            simpMessagingTemplate.convertAndSendToUser(
-                    game.getSessionIdO(),
-                    "/queue/move-made",
-                    moveRes
-            );
+            // Use session-specific topics for reliable delivery to both players
+            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
+            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
             
             // Save game to history (draw)
             gameHistoryService.saveGameHistory(
@@ -231,17 +204,9 @@ public class GameServiceImpl implements GameService {
                 game.getBoardState()
         );
 
-        simpMessagingTemplate.convertAndSendToUser(
-                game.getSessionIdX(),
-                "/queue/move-made",
-                moveRes
-        );
-        
-        simpMessagingTemplate.convertAndSendToUser(
-                game.getSessionIdO(),
-                "/queue/move-made",
-                moveRes
-        );
+        // Use session-specific topics for reliable delivery to both players
+        simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
+        simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
     }
 
     private ActiveGame createGame(CreateOrJoinGameReq request, String sessionId) {
@@ -249,16 +214,20 @@ public class GameServiceImpl implements GameService {
         game.setBoardVerticalSize(request.getBoardVerticalSize());
         game.setBoardHorizontalSize(request.getBoardHorizontalSize());
 
+        // Randomly assign the creating player as X or O (fix the original bug with nextInt)
         Random random = new Random();
-        int randomNumber = random.nextInt(0, 1);
+        int randomNumber = random.nextInt(2); // Returns 0 or 1
         if (randomNumber == 0) {
             game.setSessionIdX(sessionId);
+            game.setCurrentTurnSessionId(sessionId); // X goes first when opponent joins
         } else {
             game.setSessionIdO(sessionId);
+            // For O player, we can't set currentTurnSessionId to X's ID since X doesn't exist yet
+            // We'll just set it to the current player for now; it will be corrected when the game truly starts
+            game.setCurrentTurnSessionId(sessionId);
         }
 
         game.setStatus(GameStatus.WAITING);
-        game.setCurrentTurnSessionId(game.getSessionIdO());
 
         return activeGameRepository.save(game);
     }
