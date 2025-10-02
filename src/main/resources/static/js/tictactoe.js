@@ -2,7 +2,6 @@ class TicTacToeGame {
     constructor() {
         this.stompClient = null;
         this.sessionId = this.generateSessionId();
-        this.deviceId = this.generateDeviceId();
         this.gameId = null;
         this.playerRole = null;
         this.currentTurn = null;
@@ -65,12 +64,7 @@ class TicTacToeGame {
         // Generate a simple session ID based on current time and random value
         return 'sess_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
     }
-    
-    generateDeviceId() {
-        // Generate a simple device ID based on current time and a random value
-        return 'dev_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
-    }
-    
+
     connect() {
         // Include session ID as a query parameter
         const socket = new SockJS('/socket/tic-tac-toe?sessionId=' + this.sessionId);
@@ -105,8 +99,7 @@ class TicTacToeGame {
             gameId: null, // null means create new game
             boardVerticalSize: this.boardVerticalSize,
             boardHorizontalSize: this.boardHorizontalSize,
-            sessionId: this.sessionId,
-            deviceId: this.deviceId
+            sessionId: this.sessionId
         };
         
         console.log('Sending create game request:', gameData);
@@ -118,8 +111,7 @@ class TicTacToeGame {
             gameId: gameId,
             boardVerticalSize: 0, // Will be ignored on the backend when joining existing game
             boardHorizontalSize: 0, // Will be ignored on the backend when joining existing game
-            sessionId: this.sessionId,
-            deviceId: this.deviceId
+            sessionId: this.sessionId
         };
         
         console.log('Sending join game request:', gameData);
@@ -136,7 +128,6 @@ class TicTacToeGame {
         const moveData = {
             gameId: this.gameId,
             sessionId: this.sessionId,
-            deviceId: this.deviceId,
             row: row,
             col: col
         };
@@ -153,6 +144,15 @@ class TicTacToeGame {
             this.playerRole = 'X';
         } else if (data.sessionIdO === this.sessionId) {
             this.playerRole = 'O';
+        } else {
+            // This should not happen in a valid game - log an error
+            console.error('Player session ID does not match either player in the game:', {
+                mySessionId: this.sessionId,
+                sessionIdX: data.sessionIdX,
+                sessionIdO: data.sessionIdO,
+                gameId: data.gameId
+            });
+            return; // Don't proceed if player isn't properly assigned
         }
         
         this.boardVerticalSize = data.boardVerticalSize;
@@ -165,6 +165,13 @@ class TicTacToeGame {
             this.playerSymbol.textContent = this.playerRole;
             this.gameStatus.textContent = 'Waiting for opponent...';
             
+            // Initialize empty board state if not already done
+            if (!this.gameBoard) {
+                this.gameBoard = Array(this.boardVerticalSize).fill().map(() => 
+                    Array(this.boardHorizontalSize).fill('')
+                );
+            }
+            
             // Render empty board
             this.renderBoard();
         } else if (data.status === 'IN_PROGRESS') {
@@ -173,6 +180,12 @@ class TicTacToeGame {
                               (this.playerRole === 'X' ? 'O' : 'X');
             this.gameStatus.textContent = 'Game in progress';
             this.currentTurnDisplay.textContent = this.currentTurn;
+            
+            // Show the game screen for this player
+            this.showGameScreen();
+            
+            // Update game ID display
+            this.gameIdDisplay.textContent = this.gameId;
             
             // Initialize empty board state
             this.gameBoard = Array(this.boardVerticalSize).fill().map(() => 
@@ -277,6 +290,12 @@ class TicTacToeGame {
         this.initialScreen.style.display = 'none';
         this.gameScreen.style.display = 'none';
         this.gameOverScreen.style.display = 'block';
+        
+        // Clear game state variables to prevent issues in subsequent games
+        this.gameId = null;
+        this.playerRole = null;
+        this.currentTurn = null;
+        this.gameBoard = null;
     }
     
     quitGame() {

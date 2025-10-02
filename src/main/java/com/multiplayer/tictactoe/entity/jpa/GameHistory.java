@@ -48,8 +48,8 @@ public class GameHistory implements Serializable {
     @Column(columnDefinition = "TEXT") // Store as JSON string
     private String boardState;
 
-    @Column(nullable = false)
-    private String winnerId; // ID of the winning player or null in case of draw
+    @Column
+    private String winnerId;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

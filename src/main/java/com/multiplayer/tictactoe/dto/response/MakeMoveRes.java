@@ -12,12 +12,21 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MakeMoveRes {
+
     private String gameId;
+
     private String playerId;
+
     private int row;
+
     private int col;
+
     private GameStatus status;
-    private String winnerId; // ID of the winning player, null if no winner yet
-    private String nextPlayerId; // ID of the player whose turn is next
+
+    private String winnerId;
+
+    private String nextPlayerId;
+
     private Map<Character, Set<String>> boardState;
+
 }

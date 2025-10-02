@@ -8,9 +8,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MakeMoveReq {
+
     private String gameId;
+
     private String sessionId;
-    private String deviceId;
+
     private int row;
+
     private int col;
+
 }

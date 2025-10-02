@@ -52,6 +52,17 @@ public class ActiveGame implements Serializable {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    // Flag to track if game history has been saved to prevent duplicate saving
+    private Boolean historySaved = false;
+
+    public Boolean isHistorySaved() {
+        return historySaved != null && historySaved;
+    }
+
+    public void setHistorySaved(Boolean historySaved) {
+        this.historySaved = historySaved;
+    }
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**

@@ -17,6 +17,4 @@ public class CreateOrJoinGameReq {
 
     private String sessionId;
 
-    private String deviceId;
-
 }

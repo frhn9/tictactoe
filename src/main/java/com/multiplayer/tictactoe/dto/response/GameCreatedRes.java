@@ -9,10 +9,17 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GameCreatedRes {
+
     private String gameId;
+
     private String playerId;
-    private String playerRole; // 'X' or 'O'
+
+    private String playerRole;
+
     private GameStatus status;
+
     private int boardVerticalSize;
+
     private int boardHorizontalSize;
+
 }

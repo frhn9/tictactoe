@@ -2,16 +2,13 @@ package com.multiplayer.tictactoe.service.impl;
 
 import com.multiplayer.tictactoe.dto.request.CreateOrJoinGameReq;
 import com.multiplayer.tictactoe.dto.request.MakeMoveReq;
-import com.multiplayer.tictactoe.dto.response.GameCreatedRes;
 import com.multiplayer.tictactoe.dto.response.GameStartedRes;
 import com.multiplayer.tictactoe.dto.response.MakeMoveRes;
-import com.multiplayer.tictactoe.entity.jpa.User;
 import com.multiplayer.tictactoe.entity.redis.ActiveGame;
 import com.multiplayer.tictactoe.enums.GameStatus;
 import com.multiplayer.tictactoe.repository.ActiveGameRepository;
 import com.multiplayer.tictactoe.service.GameHistoryService;
 import com.multiplayer.tictactoe.service.GameService;
-import com.multiplayer.tictactoe.service.UserService;
 import com.multiplayer.tictactoe.utils.GameEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,7 +23,6 @@ public class GameServiceImpl implements GameService {
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final ActiveGameRepository activeGameRepository;
     private final GameEngine gameEngine;
-    private final UserService userService;
     private final GameHistoryService gameHistoryService;
 
     public void createOrJoinGame(CreateOrJoinGameReq request, String userId) {
@@ -72,17 +68,6 @@ public class GameServiceImpl implements GameService {
 
     @Override
     public void makeMove(MakeMoveReq request) {
-        // Get user based on sessionId or deviceId to extract the userId for logic
-        User user = userService.findBySessionId(request.getSessionId());
-        if (user == null) {
-            user = userService.findByDeviceId(request.getDeviceId());
-        }
-        
-        if (user == null) {
-            throw new RuntimeException("User not found for session: " + request.getSessionId() + " or device: " + request.getDeviceId());
-        }
-        
-        String userId = user.getId().toString();
         String userSessionId = request.getSessionId();
 
         // Get the game from repository
@@ -128,18 +113,23 @@ public class GameServiceImpl implements GameService {
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
             
-            // Save game to history
-            gameHistoryService.saveGameHistory(
-                    game.getGameId(),
-                    game.getSessionIdX(),
-                    game.getSessionIdO(),
-                    game.getStatus(),
-                    game.getBoardVerticalSize(),
-                    game.getBoardHorizontalSize(),
-                    game.getBoardState() != null ? game.getBoardState().toString() : null,
-                    winnerSessionId,
-                    null // durationMs could be calculated if needed
-            );
+            // Only save game to history if not already saved to prevent duplicate entries
+            if (!game.isHistorySaved()) {
+                game.setHistorySaved(true);
+                
+                // Save game to history
+                gameHistoryService.saveGameHistory(
+                        game.getGameId(),
+                        game.getSessionIdX(),
+                        game.getSessionIdO(),
+                        game.getStatus(),
+                        game.getBoardVerticalSize(),
+                        game.getBoardHorizontalSize(),
+                        game.getBoardState() != null ? game.getBoardState().toString() : null,
+                        winnerSessionId,
+                        null // durationMs could be calculated if needed
+                );
+            }
             
             // Optionally delete the active game from Redis since it's completed
             activeGameRepository.deleteById(game.getGameId());
@@ -170,18 +160,23 @@ public class GameServiceImpl implements GameService {
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
             
-            // Save game to history (draw)
-            gameHistoryService.saveGameHistory(
-                    game.getGameId(),
-                    game.getSessionIdX(),
-                    game.getSessionIdO(),
-                    game.getStatus(),
-                    game.getBoardVerticalSize(),
-                    game.getBoardHorizontalSize(),
-                    game.getBoardState() != null ? game.getBoardState().toString() : null,
-                    null, // No winner in a draw
-                    null // durationMs could be calculated if needed
-            );
+            // Only save game to history if not already saved to prevent duplicate entries
+            if (!game.isHistorySaved()) {
+                game.setHistorySaved(true);
+                
+                // Save game to history (draw)
+                gameHistoryService.saveGameHistory(
+                        game.getGameId(),
+                        game.getSessionIdX(),
+                        game.getSessionIdO(),
+                        game.getStatus(),
+                        game.getBoardVerticalSize(),
+                        game.getBoardHorizontalSize(),
+                        game.getBoardState() != null ? game.getBoardState().toString() : null,
+                        null, // No winner in a draw
+                        null // durationMs could be calculated if needed
+                );
+            }
             
             // Optionally delete the active game from Redis since it's completed
             activeGameRepository.deleteById(game.getGameId());
@@ -214,7 +209,7 @@ public class GameServiceImpl implements GameService {
         game.setBoardVerticalSize(request.getBoardVerticalSize());
         game.setBoardHorizontalSize(request.getBoardHorizontalSize());
 
-        // Randomly assign the creating player as X or O (fix the original bug with nextInt)
+        // Randomly assign the creating player as X or O
         Random random = new Random();
         int randomNumber = random.nextInt(2); // Returns 0 or 1
         if (randomNumber == 0) {
@@ -222,9 +217,7 @@ public class GameServiceImpl implements GameService {
             game.setCurrentTurnSessionId(sessionId); // X goes first when opponent joins
         } else {
             game.setSessionIdO(sessionId);
-            // For O player, we can't set currentTurnSessionId to X's ID since X doesn't exist yet
-            // We'll just set it to the current player for now; it will be corrected when the game truly starts
-            game.setCurrentTurnSessionId(sessionId);
+            game.setCurrentTurnSessionId(sessionId); // O goes first when opponent joins
         }
 
         game.setStatus(GameStatus.WAITING);
@@ -255,15 +248,15 @@ public class GameServiceImpl implements GameService {
             throw new RuntimeException("You are already in this game as Player O");
         }
 
-        Random random = new Random();
-        int randomNumber = random.nextInt(0, 1);
-        if (randomNumber == 0 && game.getSessionIdX() == null && game.getSessionIdO() != null) {
+        // Assign the joining player to the available slot
+        if (game.getSessionIdX() == null) {
             game.setSessionIdX(sessionId);
-        } else {
+        } else if (game.getSessionIdO() == null) {
             game.setSessionIdO(sessionId);
         }
 
         game.setStatus(GameStatus.IN_PROGRESS);
+        // In Tic Tac Toe, X always goes first, regardless of who created the game
         game.setCurrentTurnSessionId(game.getSessionIdX());
 
         return activeGameRepository.save(game);
