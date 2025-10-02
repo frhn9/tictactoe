@@ -28,25 +28,21 @@ public class GameServiceImpl implements GameService {
     public void createOrJoinGame(CreateOrJoinGameReq request, String userId) {
         if (request.getGameId() == null || request.getGameId().trim().isEmpty()) {
             ActiveGame game = createGame(request, request.getSessionId());
-            
-            // Send the game started message to the creator so they can see the game board
-            // even while waiting for an opponent
+
             GameStartedRes gameStartedRes = new GameStartedRes(
                     game.getGameId(),
                     game.getSessionIdX(),
                     game.getSessionIdO(),
                     game.getCurrentTurnSessionId(),
-                    game.getStatus(), // WAITING
+                    game.getStatus(),
                     game.getBoardVerticalSize(),
                     game.getBoardHorizontalSize()
             );
-            
-            // Use session-specific topic for reliable delivery
+
             simpMessagingTemplate.convertAndSend("/topic/session/" + request.getSessionId(), gameStartedRes);
         } else {
             ActiveGame game = joinGame(request, request.getSessionId());
 
-            // Send websocket notification that game has started
             if (game.getStatus() == GameStatus.IN_PROGRESS) {
                 GameStartedRes gameStartedRes = new GameStartedRes(
                         game.getGameId(),
@@ -57,9 +53,7 @@ public class GameServiceImpl implements GameService {
                         game.getBoardVerticalSize(),
                         game.getBoardHorizontalSize()
                 );
-                
-                // Send to both players
-                // Use session-specific topics for reliable delivery to both players
+
                 simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), gameStartedRes);
                 simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), gameStartedRes);
             }
@@ -70,33 +64,25 @@ public class GameServiceImpl implements GameService {
     public void makeMove(MakeMoveReq request) {
         String userSessionId = request.getSessionId();
 
-        // Get the game from repository
         ActiveGame game = activeGameRepository.findById(request.getGameId())
                 .orElseThrow(() -> new RuntimeException("Game not found: " + request.getGameId()));
 
-        // Validate the move using GameEngine
         if (gameEngine.isIllegalMove(game, userSessionId, request.getRow(), request.getCol())) {
-            // Send error response to the player
             throw new RuntimeException("Illegal move");
         }
 
-        // Make the move
         gameEngine.makeMove(game, userSessionId, request.getRow(), request.getCol());
 
-        // Check win condition
         Character winner = gameEngine.checkWinCondition(game, request.getRow(), request.getCol());
         if (winner != null) {
-            // Update game status based on winner
             if (winner == 'X') {
                 game.setStatus(GameStatus.X_WON);
             } else {
                 game.setStatus(GameStatus.O_WON);
             }
 
-            // Save game to update status
             game = activeGameRepository.save(game);
 
-            // Send game over message to both players
             String winnerSessionId = winner == 'X' ? game.getSessionIdX() : game.getSessionIdO();
             MakeMoveRes moveRes = new MakeMoveRes(
                     game.getGameId(),
@@ -109,15 +95,12 @@ public class GameServiceImpl implements GameService {
                     game.getBoardState()
             );
 
-            // Use session-specific topics for reliable delivery to both players
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
-            
-            // Only save game to history if not already saved to prevent duplicate entries
-            if (!game.isHistorySaved()) {
+
+            if (Boolean.FALSE.equals(game.isHistorySaved())) {
                 game.setHistorySaved(true);
-                
-                // Save game to history
+
                 gameHistoryService.saveGameHistory(
                         game.getGameId(),
                         game.getSessionIdX(),
@@ -126,45 +109,37 @@ public class GameServiceImpl implements GameService {
                         game.getBoardVerticalSize(),
                         game.getBoardHorizontalSize(),
                         game.getBoardState() != null ? game.getBoardState().toString() : null,
-                        winnerSessionId,
-                        null // durationMs could be calculated if needed
+                        winnerSessionId
                 );
             }
-            
-            // Optionally delete the active game from Redis since it's completed
+
             activeGameRepository.deleteById(game.getGameId());
             
-            return; // Exit early since game is over
+            return;
         }
 
-        // Check draw condition
         if (gameEngine.checkDrawCondition(game)) {
             game.setStatus(GameStatus.DRAW);
-            
-            // Save game to update status
+
             game = activeGameRepository.save(game);
 
-            // Send game over (draw) message to both players
             MakeMoveRes moveRes = new MakeMoveRes(
                     game.getGameId(),
                     userSessionId,
                     request.getRow(),
                     request.getCol(),
                     game.getStatus(),
-                    null, // No winner in a draw
+                    null,
                     null,
                     game.getBoardState()
             );
 
-            // Use session-specific topics for reliable delivery to both players
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
             simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
-            
-            // Only save game to history if not already saved to prevent duplicate entries
-            if (!game.isHistorySaved()) {
+
+            if (Boolean.FALSE.equals(game.isHistorySaved())) {
                 game.setHistorySaved(true);
-                
-                // Save game to history (draw)
+
                 gameHistoryService.saveGameHistory(
                         game.getGameId(),
                         game.getSessionIdX(),
@@ -173,33 +148,27 @@ public class GameServiceImpl implements GameService {
                         game.getBoardVerticalSize(),
                         game.getBoardHorizontalSize(),
                         game.getBoardState() != null ? game.getBoardState().toString() : null,
-                        null, // No winner in a draw
-                        null // durationMs could be calculated if needed
+                        null
                 );
             }
-            
-            // Optionally delete the active game from Redis since it's completed
+
             activeGameRepository.deleteById(game.getGameId());
-            
-            return; // Exit early since game is over
+            return;
         }
 
-        // Save game to update board state and turn
         game = activeGameRepository.save(game);
 
-        // Send move update to both players
         MakeMoveRes moveRes = new MakeMoveRes(
                 game.getGameId(),
                 userSessionId,
                 request.getRow(),
                 request.getCol(),
                 game.getStatus(),
-                null, // No winner yet
+                null,
                 game.getCurrentTurnSessionId(),
                 game.getBoardState()
         );
 
-        // Use session-specific topics for reliable delivery to both players
         simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
         simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
     }
@@ -209,15 +178,14 @@ public class GameServiceImpl implements GameService {
         game.setBoardVerticalSize(request.getBoardVerticalSize());
         game.setBoardHorizontalSize(request.getBoardHorizontalSize());
 
-        // Randomly assign the creating player as X or O
         Random random = new Random();
-        int randomNumber = random.nextInt(2); // Returns 0 or 1
+        int randomNumber = random.nextInt(2);
         if (randomNumber == 0) {
             game.setSessionIdX(sessionId);
-            game.setCurrentTurnSessionId(sessionId); // X goes first when opponent joins
+            game.setCurrentTurnSessionId(sessionId);
         } else {
             game.setSessionIdO(sessionId);
-            game.setCurrentTurnSessionId(sessionId); // O goes first when opponent joins
+            game.setCurrentTurnSessionId(sessionId);
         }
 
         game.setStatus(GameStatus.WAITING);
@@ -256,7 +224,6 @@ public class GameServiceImpl implements GameService {
         }
 
         game.setStatus(GameStatus.IN_PROGRESS);
-        // In Tic Tac Toe, X always goes first, regardless of who created the game
         game.setCurrentTurnSessionId(game.getSessionIdX());
 
         return activeGameRepository.save(game);

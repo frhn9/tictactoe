@@ -37,7 +37,7 @@ public class GameHistory implements Serializable {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private GameStatus status; // X_WON, O_WON, or DRAW
+    private GameStatus status;
 
     @Column(nullable = false)
     private int boardVerticalSize;
@@ -57,10 +57,7 @@ public class GameHistory implements Serializable {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    // Additional fields that might be useful
     @Column
-    private LocalDateTime completedAt; // When the game finished
-    
-    @Column
-    private Long durationMs; // Duration of the game in milliseconds
+    private LocalDateTime completedAt;
+
 }

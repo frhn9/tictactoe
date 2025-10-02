@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +18,7 @@ public class GameHistoryServiceImpl implements GameHistoryService {
     @Override
     public GameHistory saveGameHistory(String gameId, String userIdX, String userIdO, GameStatus status,
                                        int boardVerticalSize, int boardHorizontalSize, String boardState,
-                                       String winnerId, Long durationMs) {
+                                       String winnerId) {
         GameHistory gameHistory = new GameHistory();
         gameHistory.setGameId(gameId);
         gameHistory.setUserIdX(userIdX);
@@ -30,28 +29,8 @@ public class GameHistoryServiceImpl implements GameHistoryService {
         gameHistory.setBoardState(boardState);
         gameHistory.setWinnerId(winnerId);
         gameHistory.setCompletedAt(LocalDateTime.now());
-        gameHistory.setDurationMs(durationMs);
 
         return gameHistoryRepository.save(gameHistory);
     }
 
-    @Override
-    public List<GameHistory> getGameHistoryByUserId(String userId) {
-        return gameHistoryRepository.findByUserIdXOrUserIdO(userId, userId);
-    }
-
-    @Override
-    public List<GameHistory> getGameHistoryByStatus(GameStatus status) {
-        return gameHistoryRepository.findByStatus(status);
-    }
-
-    @Override
-    public List<GameHistory> getGameHistoryByUsers(String userIdX, String userIdO) {
-        return gameHistoryRepository.findByUserIdXAndUserIdO(userIdX, userIdO);
-    }
-
-    @Override
-    public GameHistory getGameHistoryById(Long id) {
-        return gameHistoryRepository.findById(id).orElse(null);
-    }
 }
