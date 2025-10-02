@@ -17,7 +17,7 @@ After 2nd player joined, play the game.
 or
 
 - Java 21
-- Docker or Docker Compose
+- Docker and Docker Compose
 
 ## Quick Start using Docker
 ```bash
