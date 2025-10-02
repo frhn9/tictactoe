@@ -21,7 +21,7 @@ or
 
 ## Quick Start using Docker
 ```bash
-git clone <repository-url>
+git clone https://github.com/frhn9/tictactoe.git
 docker-compose up -d
 ./gradlew bootRun
 ```
