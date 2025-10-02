@@ -1,0 +1,28 @@
+# Dependencies
+.gradle/
+build/
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Git
+.git/
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Secrets
+**/application.properties
+**/application-*.properties
+!**/application-docker.properties
+
+# Documentation
+*.md

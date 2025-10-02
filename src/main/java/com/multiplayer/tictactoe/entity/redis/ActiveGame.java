@@ -4,11 +4,15 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.multiplayer.tictactoe.enums.GameStatus;
-import jakarta.persistence.Id;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.redis.core.RedisHash;
+import org.springframework.data.redis.core.index.Indexed;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -34,13 +38,30 @@ public class ActiveGame implements Serializable {
     @Setter(AccessLevel.NONE)
     private String boardState;
 
-    private String currentTurnUserId;
+    private String currentTurnSessionId;
 
-    private String userIdX;
+    private String sessionIdX;
 
-    private String userIdO;
+    private String sessionIdO;
 
     private GameStatus status;
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    // Flag to track if game history has been saved to prevent duplicate saving
+    private Boolean historySaved = false;
+
+    public Boolean isHistorySaved() {
+        return historySaved != null && historySaved;
+    }
+
+    public void setHistorySaved(Boolean historySaved) {
+        this.historySaved = historySaved;
+    }
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 

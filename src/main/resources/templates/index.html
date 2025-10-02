@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Tic Tac Toe</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <h1 class="text-center my-4">Multiplayer Tic Tac Toe</h1>
+                
+                <div id="initialScreen" class="card">
+                    <div class="card-body">
+                        <h3 class="card-title text-center">Start New Game</h3>
+                        <form id="createGameForm">
+                            <div class="mb-3">
+                                <label for="boardVerticalSize" class="form-label">Board Vertical Size</label>
+                                <input type="number" class="form-control" id="boardVerticalSize" min="3" max="10" value="3" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="boardHorizontalSize" class="form-label">Board Horizontal Size</label>
+                                <input type="number" class="form-control" id="boardHorizontalSize" min="3" max="10" value="3" required>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">Create Game</button>
+                            </div>
+                        </form>
+                        
+                        <hr class="my-4">
+                        
+                        <h3 class="card-title text-center">Join Existing Game</h3>
+                        <form id="joinGameForm">
+                            <div class="mb-3">
+                                <label for="gameId" class="form-label">Game ID</label>
+                                <input type="text" class="form-control" id="gameId" required>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-secondary">Join Game</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <div id="gameScreen" class="card" style="display: none;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="card-title">Game ID: <span id="currentGameId"></span></h3>
+                            <button id="quitGameBtn" class="btn btn-danger">Quit Game</button>
+                        </div>
+                        
+                        <div class="text-center mb-3">
+                            <h4 id="gameStatus">Waiting for opponent...</h4>
+                            <p>Your symbol: <strong id="playerSymbol">X</strong></p>
+                        </div>
+                        
+                        <div class="text-center mb-3">
+                            <p>Current turn: <span id="currentTurn">X</span></p>
+                        </div>
+                        
+                        <div id="gameBoardContainer" class="text-center">
+                            <!-- Game board will be generated here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="gameOverScreen" class="card" style="display: none;">
+                    <div class="card-body text-center">
+                        <h3 class="card-title">Game Over</h3>
+                        <h4 id="gameResult"></h4>
+                        <button id="playAgainBtn" class="btn btn-primary">Play Again</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load required libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="/js/tictactoe.js"></script>
+</body>
+</html>

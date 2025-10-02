@@ -79,7 +79,7 @@ public class GameEngine {
     }
 
     private boolean isPlayersTurn(ActiveGame game, String playerName) {
-        return playerName.equals(game.getCurrentTurnUserId());
+        return playerName.equals(game.getCurrentTurnSessionId());
     }
 
     private boolean isValidPosition(ActiveGame game, int row, int col) {
@@ -88,22 +88,22 @@ public class GameEngine {
     }
 
     private boolean isValidPlayer(ActiveGame game, String playerName) {
-        return playerName.equals(game.getUserIdX()) || playerName.equals(game.getUserIdO());
+        return playerName.equals(game.getSessionIdX()) || playerName.equals(game.getSessionIdO());
     }
 
     private Character getPlayerSymbol(ActiveGame game, String playerName) {
-        if (playerName.equals(game.getUserIdX())) return 'X';
-        if (playerName.equals(game.getUserIdO())) return 'O';
+        if (playerName.equals(game.getSessionIdX())) return 'X';
+        if (playerName.equals(game.getSessionIdO())) return 'O';
 
         throw new IllegalArgumentException("Player not in this game: " + playerName);
     }
 
     private void switchTurn(ActiveGame game) {
-        String currentTurn = game.getCurrentTurnUserId();
-        if (currentTurn.equals(game.getUserIdX())) {
-            game.setCurrentTurnUserId(game.getUserIdO());
+        String currentTurn = game.getCurrentTurnSessionId();
+        if (currentTurn.equals(game.getSessionIdX())) {
+            game.setCurrentTurnSessionId(game.getSessionIdO());
         } else {
-            game.setCurrentTurnUserId(game.getUserIdX());
+            game.setCurrentTurnSessionId(game.getSessionIdX());
         }
     }
 

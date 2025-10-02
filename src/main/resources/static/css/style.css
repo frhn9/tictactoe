@@ -1,0 +1,58 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+}
+
+.game-cell {
+    width: 60px;
+    height: 60px;
+    border: 1px solid #dee2e6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.game-cell:hover {
+    background-color: #e9ecef;
+}
+
+.game-cell.x {
+    color: #0d6efd; /* Primary blue */
+}
+
+.game-cell.o {
+    color: #dc3545; /* Danger red */
+}
+
+.board-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 5px;
+}
+
+.status-message {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+#quitGameBtn, #playAgainBtn {
+    margin-top: 15px;
+}
+
+@media (max-width: 768px) {
+    .game-cell {
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+    }
+}
