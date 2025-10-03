@@ -8,6 +8,8 @@ class TicTacToeGame {
         this.gameBoard = null;
         this.boardVerticalSize = 3;
         this.boardHorizontalSize = 3;
+        this.sessionIdX = null;
+        this.sessionIdO = null;
         
         this.initializeElements();
         this.setupEventListeners();
@@ -155,6 +157,8 @@ class TicTacToeGame {
             return; // Don't proceed if player isn't properly assigned
         }
         
+        this.sessionIdX = data.sessionIdX;
+        this.sessionIdO = data.sessionIdO;
         this.boardVerticalSize = data.boardVerticalSize;
         this.boardHorizontalSize = data.boardHorizontalSize;
         
@@ -176,8 +180,8 @@ class TicTacToeGame {
             this.renderBoard();
         } else if (data.status === 'IN_PROGRESS') {
             // Game started
-            this.currentTurn = data.currentTurnSessionId === this.sessionId ? this.playerRole : 
-                              (this.playerRole === 'X' ? 'O' : 'X');
+            // Determine the current turn based on the session ID from the backend
+            this.currentTurn = data.currentTurnSessionId === this.sessionIdX ? 'X' : 'O';
             this.gameStatus.textContent = 'Game in progress';
             this.currentTurnDisplay.textContent = this.currentTurn;
             
@@ -198,8 +202,10 @@ class TicTacToeGame {
     
     handleGameStarted(data) {
         this.gameId = data.gameId;
-        this.currentTurn = data.currentTurnSessionId === this.sessionId ? this.playerRole : 
-                          (this.playerRole === 'X' ? 'O' : 'X');
+        // Determine the current turn based on the session ID from the backend
+        this.currentTurn = data.currentTurnSessionId === this.sessionIdX ? 'X' : 'O';
+        this.sessionIdX = data.sessionIdX;
+        this.sessionIdO = data.sessionIdO;
         this.boardVerticalSize = data.boardVerticalSize;
         this.boardHorizontalSize = data.boardHorizontalSize;
         
@@ -219,15 +225,14 @@ class TicTacToeGame {
     
     handleMoveMade(data) {
         if (this.gameBoard) {
-            // Update game board with move
-            this.gameBoard[data.row][data.col] = data.playerId === this.sessionId ? this.playerRole : 
-                                                 (this.playerRole === 'X' ? 'O' : 'X');
+            // Update game board with move - determine player symbol based on session ID
+            const playerSymbol = data.playerId === this.sessionIdX ? 'X' : 'O';
+            this.gameBoard[data.row][data.col] = playerSymbol;
         }
         
-        // Update current turn
+        // Update current turn based on the stored session IDs
         if (data.nextPlayerId) {
-            this.currentTurn = data.nextPlayerId === this.sessionId ? this.playerRole : 
-                              (this.playerRole === 'X' ? 'O' : 'X');
+            this.currentTurn = data.nextPlayerId === this.sessionIdX ? 'X' : 'O';
         }
         this.currentTurnDisplay.textContent = this.currentTurn;
         
@@ -235,8 +240,7 @@ class TicTacToeGame {
         
         if (data.status === 'X_WON' || data.status === 'O_WON') {
             // Game won
-            const winnerSymbol = data.winnerId === this.sessionId ? this.playerRole : 
-                                (this.playerRole === 'X' ? 'O' : 'X');
+            const winnerSymbol = data.winnerId === this.sessionIdX ? 'X' : 'O';
             this.showGameOver(`${winnerSymbol} wins!`);
         } else if (data.status === 'DRAW') {
             // Game ended in draw
@@ -308,6 +312,8 @@ class TicTacToeGame {
         this.playerRole = null;
         this.currentTurn = null;
         this.gameBoard = null;
+        this.sessionIdX = null;
+        this.sessionIdO = null;
         this.boardVerticalSize = 3;
         this.boardHorizontalSize = 3;
         

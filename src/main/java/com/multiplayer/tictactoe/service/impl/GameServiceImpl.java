@@ -4,11 +4,12 @@ import com.multiplayer.tictactoe.dto.request.CreateOrJoinGameReq;
 import com.multiplayer.tictactoe.dto.request.MakeMoveReq;
 import com.multiplayer.tictactoe.dto.response.GameStartedRes;
 import com.multiplayer.tictactoe.dto.response.MakeMoveRes;
+import com.multiplayer.tictactoe.entity.jpa.GameHistory;
 import com.multiplayer.tictactoe.entity.redis.ActiveGame;
 import com.multiplayer.tictactoe.enums.GameStatus;
 import com.multiplayer.tictactoe.mapper.GameMapper;
 import com.multiplayer.tictactoe.repository.ActiveGameRepository;
-import com.multiplayer.tictactoe.service.GameHistoryService;
+import com.multiplayer.tictactoe.repository.GameHistoryRepository;
 import com.multiplayer.tictactoe.service.GameService;
 import com.multiplayer.tictactoe.utils.GameEngine;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ public class GameServiceImpl implements GameService {
 
     private final GameEngine gameEngine;
 
-    private final GameHistoryService gameHistoryService;
+    private final GameHistoryRepository gameHistoryRepository;
 
     private final GameMapper gameMapper;
 
@@ -51,113 +52,28 @@ public class GameServiceImpl implements GameService {
 
     @Override
     public void makeMove(MakeMoveReq request) {
-        String userSessionId = request.getSessionId();
-
         ActiveGame game = activeGameRepository.findById(request.getGameId())
                 .orElseThrow(() -> new RuntimeException("Game not found: " + request.getGameId()));
 
-        if (gameEngine.isIllegalMove(game, userSessionId, request.getRow(), request.getCol())) {
+        if (gameEngine.isIllegalMove(game, request.getSessionId(), request.getRow(), request.getCol())) {
             throw new RuntimeException("Illegal move");
         }
 
-        gameEngine.makeMove(game, userSessionId, request.getRow(), request.getCol());
+        gameEngine.makeMove(game, request.getSessionId(), request.getRow(), request.getCol());
 
         Character winner = gameEngine.checkWinCondition(game, request.getRow(), request.getCol());
         if (winner != null) {
-            if (winner == 'X') {
-                game.setStatus(GameStatus.X_WON);
-            } else {
-                game.setStatus(GameStatus.O_WON);
-            }
-
-            game = activeGameRepository.save(game);
-
-            String winnerSessionId = winner == 'X' ? game.getSessionIdX() : game.getSessionIdO();
-            MakeMoveRes moveRes = new MakeMoveRes(
-                    game.getGameId(),
-                    userSessionId,
-                    request.getRow(),
-                    request.getCol(),
-                    game.getStatus(),
-                    winnerSessionId,
-                    null,
-                    game.getBoardState()
-            );
-
-            sendWebSocketMessage(game.getSessionIdX(), moveRes);
-            sendWebSocketMessage(game.getSessionIdO(), moveRes);
-
-            if (Boolean.FALSE.equals(game.isHistorySaved())) {
-                game.setHistorySaved(true);
-
-                gameHistoryService.saveGameHistory(
-                        game.getGameId(),
-                        game.getSessionIdX(),
-                        game.getSessionIdO(),
-                        game.getStatus(),
-                        game.getBoardVerticalSize(),
-                        game.getBoardHorizontalSize(),
-                        game.getBoardState() != null ? game.getBoardState().toString() : null,
-                        winnerSessionId
-                );
-            }
-
-            activeGameRepository.deleteById(game.getGameId());
-            
+            handleWinCondition(request, winner, game);
             return;
         }
 
         if (gameEngine.checkDrawCondition(game)) {
-            game.setStatus(GameStatus.DRAW);
-
-            game = activeGameRepository.save(game);
-
-            MakeMoveRes moveRes = new MakeMoveRes(
-                    game.getGameId(),
-                    userSessionId,
-                    request.getRow(),
-                    request.getCol(),
-                    game.getStatus(),
-                    null,
-                    null,
-                    game.getBoardState()
-            );
-
-            sendWebSocketMessage(game.getSessionIdX(), moveRes);
-            sendWebSocketMessage(game.getSessionIdO(), moveRes);
-
-            if (Boolean.FALSE.equals(game.isHistorySaved())) {
-                game.setHistorySaved(true);
-
-                gameHistoryService.saveGameHistory(
-                        game.getGameId(),
-                        game.getSessionIdX(),
-                        game.getSessionIdO(),
-                        game.getStatus(),
-                        game.getBoardVerticalSize(),
-                        game.getBoardHorizontalSize(),
-                        game.getBoardState() != null ? game.getBoardState().toString() : null,
-                        null
-                );
-            }
-
-            activeGameRepository.deleteById(game.getGameId());
+            handleDrawCondition(request, game);
             return;
         }
 
         game = activeGameRepository.save(game);
-
-        MakeMoveRes moveRes = new MakeMoveRes(
-                game.getGameId(),
-                userSessionId,
-                request.getRow(),
-                request.getCol(),
-                game.getStatus(),
-                null,
-                game.getCurrentTurnSessionId(),
-                game.getBoardState()
-        );
-
+        MakeMoveRes moveRes = gameMapper.toMakeMoveResWithNextPlayer(game, request, null);
         sendWebSocketMessage(game.getSessionIdX(), moveRes);
         sendWebSocketMessage(game.getSessionIdO(), moveRes);
     }
@@ -208,7 +124,7 @@ public class GameServiceImpl implements GameService {
         // Assign the joining player to the available slot
         if (game.getSessionIdX() == null) {
             game.setSessionIdX(sessionId);
-        } else if (game.getSessionIdO() == null) {
+        } else {
             game.setSessionIdO(sessionId);
         }
 
@@ -216,6 +132,48 @@ public class GameServiceImpl implements GameService {
         game.setCurrentTurnSessionId(game.getSessionIdX());
 
         return activeGameRepository.save(game);
+    }
+
+    private void handleWinCondition(MakeMoveReq request, Character winner, ActiveGame game) {
+        if (winner == 'X') {
+            game.setStatus(GameStatus.X_WON);
+        } else {
+            game.setStatus(GameStatus.O_WON);
+        }
+
+        game = activeGameRepository.save(game);
+
+        String winnerSessionId = winner == 'X' ? game.getSessionIdX() : game.getSessionIdO();
+        MakeMoveRes moveRes = gameMapper.toMakeMoveResNoNextPlayer(game, request, winnerSessionId);
+
+        sendWebSocketMessage(game.getSessionIdX(), moveRes);
+        sendWebSocketMessage(game.getSessionIdO(), moveRes);
+
+        if (Boolean.FALSE.equals(game.isHistorySaved())) {
+            game.setHistorySaved(true);
+            GameHistory gameHistory = gameMapper.toGameHistoryEntity(game, winnerSessionId);
+            gameHistoryRepository.save(gameHistory);
+        }
+
+        activeGameRepository.deleteById(game.getGameId());
+    }
+
+    private void handleDrawCondition(MakeMoveReq request, ActiveGame game) {
+        game.setStatus(GameStatus.DRAW);
+        game = activeGameRepository.save(game);
+
+        MakeMoveRes moveRes = gameMapper.toMakeMoveResNoNextPlayer(game, request, null);
+
+        sendWebSocketMessage(game.getSessionIdX(), moveRes);
+        sendWebSocketMessage(game.getSessionIdO(), moveRes);
+
+        if (Boolean.FALSE.equals(game.isHistorySaved())) {
+            game.setHistorySaved(true);
+            GameHistory gameHistory = gameMapper.toGameHistoryEntity(game, null);
+            gameHistoryRepository.save(gameHistory);
+        }
+
+        activeGameRepository.deleteById(game.getGameId());
     }
 
     private void sendWebSocketMessage(String sessionId, Object payload) {
