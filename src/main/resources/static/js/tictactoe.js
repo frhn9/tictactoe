@@ -79,10 +79,12 @@ class TicTacToeGame {
             this.stompClient.subscribe('/topic/session/' + this.sessionId, (message) => {
                 console.log('Received game notification:', message.body);
                 const data = JSON.parse(message.body);
-                
-                // The backend now sends all game notifications to the session topic
-                // Check if it's a game status update (game creation/join) or move notification
-                if (data.hasOwnProperty('currentTurnSessionId') && data.hasOwnProperty('boardVerticalSize')) {
+
+                // Check message type based on properties
+                if (data.hasOwnProperty('errorCode')) {
+                    // This is an error notification
+                    this.handleErrorNotification(data);
+                } else if (data.hasOwnProperty('currentTurnSessionId') && data.hasOwnProperty('boardVerticalSize')) {
                     // This is a game start notification
                     this.handleGameNotification(data);
                 } else if (data.hasOwnProperty('nextPlayerId')) {
@@ -300,6 +302,33 @@ class TicTacToeGame {
         this.playerRole = null;
         this.currentTurn = null;
         this.gameBoard = null;
+    }
+    
+    handleErrorNotification(data) {
+        console.error('Error received from server:', data);
+        
+        // Show an alert based on the error code
+        switch(data.errorCode) {
+            case 'GAME_FULL':
+                alert('Error: The game is already full. Please try joining a different game.');
+                break;
+            case 'GAME_NOT_WAITING':
+                alert('Error: The game is no longer waiting for players.');
+                break;
+            case 'ALREADY_IN_GAME_AS_X':
+            case 'ALREADY_IN_GAME_AS_O':
+                alert('Error: You are already in this game.');
+                break;
+            case 'GAME_NOT_FOUND':
+                alert('Error: Game not found. Please check the game ID.');
+                break;
+            case 'ILLEGAL_MOVE':
+                alert('Error: Illegal move. Please try a different position.');
+                break;
+            default:
+                alert('Error: ' + data.message);
+                break;
+        }
     }
     
     quitGame() {

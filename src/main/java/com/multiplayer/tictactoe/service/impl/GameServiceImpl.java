@@ -7,6 +7,8 @@ import com.multiplayer.tictactoe.dto.response.MakeMoveRes;
 import com.multiplayer.tictactoe.entity.jpa.GameHistory;
 import com.multiplayer.tictactoe.entity.redis.ActiveGame;
 import com.multiplayer.tictactoe.enums.GameStatus;
+import com.multiplayer.tictactoe.exception.GameErrorType;
+import com.multiplayer.tictactoe.exception.GameException;
 import com.multiplayer.tictactoe.mapper.GameMapper;
 import com.multiplayer.tictactoe.repository.ActiveGameRepository;
 import com.multiplayer.tictactoe.repository.GameHistoryRepository;
@@ -24,11 +26,10 @@ public class GameServiceImpl implements GameService {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
 
+    private final GameHistoryRepository gameHistoryRepository;
     private final ActiveGameRepository activeGameRepository;
 
     private final GameEngine gameEngine;
-
-    private final GameHistoryRepository gameHistoryRepository;
 
     private final GameMapper gameMapper;
 
@@ -53,10 +54,10 @@ public class GameServiceImpl implements GameService {
     @Override
     public void makeMove(MakeMoveReq request) {
         ActiveGame game = activeGameRepository.findById(request.getGameId())
-                .orElseThrow(() -> new RuntimeException("Game not found: " + request.getGameId()));
+                .orElseThrow(() -> new GameException(GameErrorType.GAME_NOT_FOUND, request.getSessionId()));
 
         if (gameEngine.isIllegalMove(game, request.getSessionId(), request.getRow(), request.getCol())) {
-            throw new RuntimeException("Illegal move");
+            throw new GameException(GameErrorType.ILLEGAL_MOVE, request.getSessionId());
         }
 
         gameEngine.makeMove(game, request.getSessionId(), request.getRow(), request.getCol());
@@ -100,25 +101,25 @@ public class GameServiceImpl implements GameService {
 
     private ActiveGame joinGame(CreateOrJoinGameReq request, String sessionId) {
         ActiveGame game = activeGameRepository.findById(request.getGameId())
-                .orElseThrow(() -> new RuntimeException("Game not found: " + request.getGameId()));
+                .orElseThrow(() -> new GameException(GameErrorType.GAME_NOT_FOUND, sessionId));
 
         // Validate game state
         if (game.getStatus() != GameStatus.WAITING) {
-            throw new RuntimeException("Game is not waiting for players. Status: " + game.getStatus());
+            throw new GameException(GameErrorType.GAME_NOT_WAITING, sessionId);
         }
 
         // Check if game is already full
         if (game.getSessionIdX() != null && game.getSessionIdO() != null) {
-            throw new RuntimeException("Game is already full");
+            throw new GameException(GameErrorType.GAME_FULL, sessionId);
         }
 
         // Check if player is already in the game
         if (sessionId.equals(game.getSessionIdX())) {
-            throw new RuntimeException("You are already in this game as Player X");
+            throw new GameException(GameErrorType.ALREADY_IN_GAME_AS_X, sessionId);
         }
 
         if (sessionId.equals(game.getSessionIdO())) {
-            throw new RuntimeException("You are already in this game as Player O");
+            throw new GameException(GameErrorType.ALREADY_IN_GAME_AS_O, sessionId);
         }
 
         // Assign the joining player to the available slot
