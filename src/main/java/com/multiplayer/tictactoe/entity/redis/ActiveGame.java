@@ -9,7 +9,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.redis.core.RedisHash;
-import org.springframework.data.redis.core.index.Indexed;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -57,10 +56,6 @@ public class ActiveGame implements Serializable {
 
     public Boolean isHistorySaved() {
         return historySaved != null && historySaved;
-    }
-
-    public void setHistorySaved(Boolean historySaved) {
-        this.historySaved = historySaved;
     }
 
     private static final ObjectMapper objectMapper = new ObjectMapper();

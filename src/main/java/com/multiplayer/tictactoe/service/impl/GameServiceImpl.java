@@ -6,6 +6,7 @@ import com.multiplayer.tictactoe.dto.response.GameStartedRes;
 import com.multiplayer.tictactoe.dto.response.MakeMoveRes;
 import com.multiplayer.tictactoe.entity.redis.ActiveGame;
 import com.multiplayer.tictactoe.enums.GameStatus;
+import com.multiplayer.tictactoe.mapper.GameMapper;
 import com.multiplayer.tictactoe.repository.ActiveGameRepository;
 import com.multiplayer.tictactoe.service.GameHistoryService;
 import com.multiplayer.tictactoe.service.GameService;
@@ -21,41 +22,29 @@ import java.util.Random;
 public class GameServiceImpl implements GameService {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
+
     private final ActiveGameRepository activeGameRepository;
+
     private final GameEngine gameEngine;
+
     private final GameHistoryService gameHistoryService;
+
+    private final GameMapper gameMapper;
 
     public void createOrJoinGame(CreateOrJoinGameReq request, String userId) {
         if (request.getGameId() == null || request.getGameId().trim().isEmpty()) {
             ActiveGame game = createGame(request, request.getSessionId());
+            GameStartedRes gameStartedRes = gameMapper.toGameStartedRes(game);
 
-            GameStartedRes gameStartedRes = new GameStartedRes(
-                    game.getGameId(),
-                    game.getSessionIdX(),
-                    game.getSessionIdO(),
-                    game.getCurrentTurnSessionId(),
-                    game.getStatus(),
-                    game.getBoardVerticalSize(),
-                    game.getBoardHorizontalSize()
-            );
-
-            simpMessagingTemplate.convertAndSend("/topic/session/" + request.getSessionId(), gameStartedRes);
+            sendWebSocketMessage(request.getSessionId(), gameStartedRes);
         } else {
             ActiveGame game = joinGame(request, request.getSessionId());
 
             if (game.getStatus() == GameStatus.IN_PROGRESS) {
-                GameStartedRes gameStartedRes = new GameStartedRes(
-                        game.getGameId(),
-                        game.getSessionIdX(),
-                        game.getSessionIdO(),
-                        game.getCurrentTurnSessionId(),
-                        game.getStatus(),
-                        game.getBoardVerticalSize(),
-                        game.getBoardHorizontalSize()
-                );
+                GameStartedRes gameStartedRes = gameMapper.toGameStartedRes(game);
 
-                simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), gameStartedRes);
-                simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), gameStartedRes);
+                sendWebSocketMessage(game.getSessionIdX(), gameStartedRes);
+                sendWebSocketMessage(game.getSessionIdO(), gameStartedRes);
             }
         }
     }
@@ -95,8 +84,8 @@ public class GameServiceImpl implements GameService {
                     game.getBoardState()
             );
 
-            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
-            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
+            sendWebSocketMessage(game.getSessionIdX(), moveRes);
+            sendWebSocketMessage(game.getSessionIdO(), moveRes);
 
             if (Boolean.FALSE.equals(game.isHistorySaved())) {
                 game.setHistorySaved(true);
@@ -134,8 +123,8 @@ public class GameServiceImpl implements GameService {
                     game.getBoardState()
             );
 
-            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
-            simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
+            sendWebSocketMessage(game.getSessionIdX(), moveRes);
+            sendWebSocketMessage(game.getSessionIdO(), moveRes);
 
             if (Boolean.FALSE.equals(game.isHistorySaved())) {
                 game.setHistorySaved(true);
@@ -169,8 +158,8 @@ public class GameServiceImpl implements GameService {
                 game.getBoardState()
         );
 
-        simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdX(), moveRes);
-        simpMessagingTemplate.convertAndSend("/topic/session/" + game.getSessionIdO(), moveRes);
+        sendWebSocketMessage(game.getSessionIdX(), moveRes);
+        sendWebSocketMessage(game.getSessionIdO(), moveRes);
     }
 
     private ActiveGame createGame(CreateOrJoinGameReq request, String sessionId) {
@@ -227,6 +216,10 @@ public class GameServiceImpl implements GameService {
         game.setCurrentTurnSessionId(game.getSessionIdX());
 
         return activeGameRepository.save(game);
+    }
+
+    private void sendWebSocketMessage(String sessionId, Object payload) {
+        simpMessagingTemplate.convertAndSend("/topic/session/" + sessionId, payload);
     }
 
 }
